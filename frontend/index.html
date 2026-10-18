@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyBuddy AI — Your Smart Academic Assistant</title>
+  <meta name="description" content="StudyBuddy AI helps students with Math, Science, Programming, English, and more." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Phosphor Icons (lightweight, modern icon set) -->
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1/src/index.js" defer></script>
+
+  <!-- Marked.js for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Highlight.js for code syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+  <!-- ═══════════════════════════════════════════════ SIDEBAR ═══ -->
+  <aside class="sidebar" id="sidebar">
+    <!-- Logo -->
+    <div class="sidebar__logo">
+      <div class="logo-icon">
+        <i class="ph-fill ph-graduation-cap"></i>
+      </div>
+      <div class="logo-text">
+        <span class="logo-name">StudyBuddy</span>
+        <span class="logo-badge">AI</span>
+      </div>
+    </div>
+
+    <!-- New Chat Button -->
+    <button class="btn-new-chat" id="btnNewChat">
+      <i class="ph ph-plus"></i>
+      <span>New Chat</span>
+    </button>
+
+    <!-- Subject Filter -->
+    <div class="sidebar__section">
+      <p class="sidebar__label">Subjects</p>
+      <div class="subject-pills" id="subjectPills">
+        <button class="pill pill--active" data-subject="General">All</button>
+        <button class="pill" data-subject="Mathematics">Math</button>
+        <button class="pill" data-subject="Science">Science</button>
+        <button class="pill" data-subject="Programming">Code</button>
+        <button class="pill" data-subject="English">English</button>
+        <button class="pill" data-subject="History">History</button>
+      </div>
+    </div>
+
+    <!-- Language Selector -->
+    <div class="sidebar__section">
+      <p class="sidebar__label">Language</p>
+      <div class="lang-toggle" id="langToggle">
+        <button class="lang-btn lang-btn--active" data-lang="English">🇬🇧 English</button>
+        <button class="lang-btn" data-lang="Hindi">🇮🇳 Hindi</button>
+      </div>
+    </div>
+
+    <!-- Session History -->
+    <div class="sidebar__section sidebar__history">
+      <p class="sidebar__label">Today's Chats</p>
+      <ul class="history-list" id="historyList">
+        <li class="history-empty">No chats yet. Start asking!</li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="sidebar__footer">
+      <div class="api-status" id="apiStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Checking connection…</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Mobile sidebar toggle backdrop -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <!-- ═══════════════════════════════════════════════ MAIN ══════ -->
+  <main class="main">
+    <!-- Top bar -->
+    <header class="topbar">
+      <button class="topbar__menu-btn" id="menuToggle" aria-label="Toggle menu">
+        <i class="ph ph-list"></i>
+      </button>
+
+      <div class="topbar__center">
+        <div class="topbar__logo">
+          <i class="ph-fill ph-graduation-cap"></i>
+          <span>StudyBuddy AI</span>
+        </div>
+      </div>
+
+      <div class="topbar__actions">
+        <span class="topbar__subject-badge" id="currentSubjectBadge">General</span>
+        <button class="topbar__icon-btn" id="clearChatBtn" title="Clear Chat">
+          <i class="ph ph-trash"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Chat window -->
+    <section class="chat-window" id="chatWindow">
+
+      <!-- Empty / Welcome State -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-state__icon">
+          <i class="ph-fill ph-graduation-cap"></i>
+        </div>
+        <h2 class="empty-state__title">Hi Student! 👋</h2>
+        <p class="empty-state__subtitle">What would you like to learn today?</p>
+
+        <!-- Suggested Questions -->
+        <div class="suggestions" id="suggestions">
+          <p class="suggestions__label">Try asking:</p>
+          <div class="suggestions__grid">
+            <button class="suggestion-card" data-question="Explain Python loops with an example">
+              <i class="ph ph-code"></i>
+              <span>Explain Python loops</span>
+            </button>
+            <button class="suggestion-card" data-question="Solve: If a train travels at 60 km/h for 2.5 hours, how far does it go?">
+              <i class="ph ph-calculator"></i>
+              <span>Solve a math problem</span>
+            </button>
+            <button class="suggestion-card" data-question="What is photosynthesis? Explain it simply.">
+              <i class="ph ph-leaf"></i>
+              <span>What is photosynthesis?</span>
+            </button>
+            <button class="suggestion-card" data-question="Help me improve my English essay writing skills">
+              <i class="ph ph-pencil-line"></i>
+              <span>Improve my English writing</span>
+            </button>
+            <button class="suggestion-card" data-question="Explain Newton's three laws of motion with real-life examples">
+              <i class="ph ph-atom"></i>
+              <span>Newton's Laws of Motion</span>
+            </button>
+            <button class="suggestion-card" data-question="What is the difference between a list and a tuple in Python?">
+              <i class="ph ph-brackets-curly"></i>
+              <span>List vs Tuple in Python</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages Container -->
+      <div class="messages" id="messages"></div>
+
+    </section>
+
+    <!-- Input Area -->
+    <footer class="input-area">
+      <div class="input-wrapper">
+        <textarea
+          class="input-box"
+          id="messageInput"
+          placeholder="Ask anything… Maths, Science, Code, English 📚"
+          rows="1"
+          maxlength="2000"
+        ></textarea>
+        <button class="send-btn" id="sendBtn" disabled>
+          <i class="ph-fill ph-paper-plane-tilt"></i>
+        </button>
+      </div>
+      <p class="input-hint">
+        <i class="ph ph-info"></i>
+        Press <kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> for new line
+      </p>
+    </footer>
+  </main>
+
+  <!-- ═══════════════════════════════════════════════ TOAST ═════ -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Main script -->
+  <script src="js/app.js"></script>
+</body>
+</html>

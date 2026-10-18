@@ -1,0 +1,67 @@
+# ════════════════════════════════════════════════════════════════════════════
+# Netlify Configuration — StudyBuddy AI
+# ════════════════════════════════════════════════════════════════════════════
+
+[build]
+  # Serve files from the frontend/ directory
+  publish = "frontend"
+  # Netlify Serverless Functions directory
+  functions = "netlify/functions"
+  # No build step needed — pure static HTML/CSS/JS
+  command = "echo 'Build complete ✓'"
+
+[build.environment]
+  # Use Python 3.11 for serverless functions
+  PYTHON_VERSION = "3.11"
+
+# ── Function-level settings ──────────────────────────────────────────────────
+[functions]
+  # Allow up to 30 seconds for AI responses
+  node_bundler = "esbuild"
+
+[functions."chat"]
+  timeout = 30
+
+[functions."health"]
+  timeout = 5
+
+# ── URL Redirects ────────────────────────────────────────────────────────────
+# Route /chat → /.netlify/functions/chat  (AI responses)
+[[redirects]]
+  from   = "/chat"
+  to     = "/.netlify/functions/chat"
+  status = 200
+  force  = true
+
+# Route /health → /.netlify/functions/health  (status check)
+[[redirects]]
+  from   = "/health"
+  to     = "/.netlify/functions/health"
+  status = 200
+  force  = true
+
+# SPA fallback — serve index.html for all other routes
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# ── Security Headers ─────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+    Permissions-Policy     = "camera=(), microphone=(), geolocation=()"
+
+# Cache static assets aggressively
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

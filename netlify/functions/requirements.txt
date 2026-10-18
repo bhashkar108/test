@@ -1,0 +1,3 @@
+# Python dependencies for Netlify Serverless Functions
+# Netlify automatically installs these before deploying functions.
+google-generativeai==0.8.3
