@@ -10,10 +10,7 @@ const CONFIG = {
   // Auto-detect environment:
   //   • localhost / 127.0.0.1 → hit local FastAPI server on port 8000
   //   • Netlify / any other host → use relative URLs (netlify.toml rewrites /chat & /health to serverless functions)
-  API_BASE: (
-    window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1"
-  ) ? "http://localhost:8000" : "",
+  API_BASE: "https://test-qbzo.onrender.com",
   MAX_HISTORY: 20,                     // Keep last N messages for context
   TYPING_DELAY_MS: 400,               // Fake delay so loader is visible briefly
   HEALTH_CHECK_INTERVAL: 30_000,      // ms between health-check polls
