@@ -1,6 +1,6 @@
 """
 StudyBuddy AI — FastAPI Backend
-Handles chat requests and communicates with Google Gemini API.
+Handles chat requests and communicates with Google Gemini API (New SDK).
 """
 
 import os
@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
-from google import  genai
+from google import genai
 from dotenv import load_dotenv
 
 # ── Load environment variables ──────────────────────────────────────────────
@@ -34,26 +34,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Gemini client setup ──────────────────────────────────────────────────────
-gemini_model = None
+# ── Gemini client setup (New Google GenAI SDK) ──────────────────────────────
+client = None
 
 def init_gemini():
-    global gemini_model
+    global client
     if GEMINI_API_KEY:
         try:
-            genai.configure(api_key=GEMINI_API_KEY)
-            gemini_model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
-                generation_config={
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "max_output_tokens": 2048,
-                },
-            )
-            print("✅ Gemini API initialized successfully.")
+            client = genai.Client(api_key=GEMINI_API_KEY)
+            print("✅ Gemini API client initialized successfully.")
         except Exception as e:
             print(f"⚠️  Gemini init error: {e}")
-            gemini_model = None
+            client = None
     else:
         print("⚠️  GEMINI_API_KEY not set. AI responses will not work.")
 
@@ -61,7 +53,7 @@ init_gemini()
 
 # ── Pydantic schemas ─────────────────────────────────────────────────────────
 class Message(BaseModel):
-    role: str          # "user" | "model"
+    role: str         # "user" | "model"
     content: str
 
 class ChatRequest(BaseModel):
@@ -74,7 +66,7 @@ class ChatResponse(BaseModel):
     reply: str
     timestamp: float
 
-# ── System prompt factory ────────────────────────────────────────────────────
+# ── System prompt factory ────────────────────────────────____________________
 def build_system_prompt(language: str, subject: str) -> str:
     lang_instruction = (
         "Respond in simple, easy-to-understand Hindi (Hinglish is also acceptable)."
@@ -110,40 +102,37 @@ Remember: You are talking to a student. Be warm, supportive, and encouraging!"""
 async def health():
     return {
         "status": "ok",
-        "ai_ready": gemini_model is not None,
-        "model": "gemini-1.5-flash" if gemini_model else None,
+        "ai_ready": client is not None,
+        "model": "gemini-1.5-flash" if client else None,
     }
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    if not gemini_model:
+    if not client:
         raise HTTPException(
             status_code=503,
-            detail="AI service is not configured. Please set GEMINI_API_KEY in the .env file.",
+            detail="AI service is not configured. Please set GEMINI_API_KEY in environment variables.",
         )
 
     try:
         system_prompt = build_system_prompt(req.language, req.subject)
 
-        # Build Gemini conversation history
-        gemini_history = []
-        for msg in req.history[-10:]:   # Keep last 10 messages for context
-            gemini_history.append({
-                "role": msg.role,
-                "parts": [msg.content],
-            })
+        # Build contents for the new SDK format
+        contents = []
+        for msg in req.history[-10:]:
+            role_name = "user" if msg.role == "user" else "model"
+            contents.append(f"{role_name}: {msg.content}")
 
-        # Start a chat session with history
-        chat_session = gemini_model.start_chat(history=gemini_history)
-
-        # Prepend system context to the first user message
+        # Add current user message with system context
         full_message = f"{system_prompt}\n\nStudent question: {req.message}"
-        if req.history:
-            # Only prepend system on the first message; after that keep context
-            full_message = req.message
+        contents.append(f"user: {full_message}")
 
-        response = chat_session.send_message(full_message)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=contents,
+        )
+        
         reply_text = response.text.strip()
 
         return ChatResponse(reply=reply_text, timestamp=time.time())
