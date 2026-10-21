@@ -1,16 +1,22 @@
 """
 StudyBuddy AI — Netlify Serverless Function: /chat
 Handles student questions via Google Gemini API.
+Includes automatic retry with exponential backoff for rate limits.
 """
 
 import json
 import os
 import time
+import random
 
 import google.generativeai as genai
 
 # ── Env ──────────────────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+# ── Retry config ──────────────────────────────────────────────────────────────
+MAX_RETRIES   = 3      # retry up to 3 times on rate limit
+BASE_DELAY    = 2.0    # seconds — doubles each retry (2 → 4 → 8)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -97,17 +103,12 @@ def handler(event, context):
     if not message:
         return json_response(400, {"detail": "Message cannot be empty."})
 
-    # Call Gemini
+    # Call Gemini — with retry on rate limit
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            generation_config={
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "max_output_tokens": 2048,
-            },
-        )
+
+        # Try gemini-1.5-flash first; fallback to gemini-1.5-flash-8b (higher free quota)
+        models_to_try = ["gemini-1.5-flash", "gemini-1.5-flash-8b"]
 
         # Build conversation history for Gemini (last 10 turns)
         gemini_history = [
@@ -116,8 +117,6 @@ def handler(event, context):
             if m.get("role") and m.get("content")
         ]
 
-        chat_session = model.start_chat(history=gemini_history)
-
         # Prepend system prompt only on the very first message
         full_message = (
             f"{build_system_prompt(language, subject)}\n\nStudent question: {message}"
@@ -125,15 +124,65 @@ def handler(event, context):
             else message
         )
 
-        response = chat_session.send_message(full_message)
-        return json_response(200, {"reply": response.text.strip(), "timestamp": time.time()})
+        last_exc = None
 
-    except Exception as exc:
-        err_str = str(exc)
+        for model_name in models_to_try:
+            for attempt in range(MAX_RETRIES):
+                try:
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        generation_config={
+                            "temperature": 0.7,
+                            "top_p": 0.9,
+                            "max_output_tokens": 2048,
+                        },
+                    )
+                    chat_session = model.start_chat(history=gemini_history)
+                    response     = chat_session.send_message(full_message)
+                    return json_response(200, {
+                        "reply":     response.text.strip(),
+                        "timestamp": time.time(),
+                    })
+
+                except Exception as exc:
+                    last_exc = exc
+                    err_str  = str(exc)
+
+                    is_rate_limit = (
+                        "quota"  in err_str.lower() or
+                        "rate"   in err_str.lower() or
+                        "429"    in err_str or
+                        "exhausted" in err_str.lower()
+                    )
+
+                    if is_rate_limit and attempt < MAX_RETRIES - 1:
+                        # Exponential backoff: 2s, 4s, 8s + small random jitter
+                        delay = BASE_DELAY * (2 ** attempt) + random.uniform(0, 1)
+                        time.sleep(delay)
+                        continue   # retry same model
+
+                    break          # non-rate-limit error → try next model
+
+        # All models & retries exhausted — check final error type
+        err_str = str(last_exc) if last_exc else "Unknown error"
 
         if "API_KEY" in err_str or "authentication" in err_str.lower():
             return json_response(401, {"detail": "Invalid Gemini API key. Check your Netlify environment variable."})
-        if "quota" in err_str.lower() or "rate" in err_str.lower() or "429" in err_str:
-            return json_response(429, {"detail": "API rate limit reached. Please wait a moment and try again."})
+
+        if (
+            "quota"     in err_str.lower() or
+            "rate"      in err_str.lower() or
+            "429"       in err_str or
+            "exhausted" in err_str.lower()
+        ):
+            return json_response(429, {
+                "detail": (
+                    "⏳ Gemini API rate limit reached for all available models. "
+                    "This happens when too many requests are made too quickly on the free plan. "
+                    "Please wait 1–2 minutes and try again. "
+                    "If this keeps happening, you may need to upgrade your Gemini API plan at "
+                    "https://aistudio.google.com"
+                )
+            })
 
         return json_response(500, {"detail": f"AI error: {err_str}"})
